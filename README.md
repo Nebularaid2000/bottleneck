@@ -1,4 +1,4 @@
-# bottleneck
+# Representation Bottleneck
 
 ## Overview
 
@@ -30,6 +30,8 @@ Run the following shell script to train the models:
 
 You can change the gpu by changing the `--gpu_id` argument in the script.
 
+The models are saved in the `checkpoints` directory by default.
+
 ### Compute interaction
 
 Run the following shell script to compute interaction for the models:
@@ -40,6 +42,8 @@ Run the following shell script to compute interaction for the models:
 
 You can uncomment the setting you want to run on top of the script.
 
+The results are saved in the `results` directory by default.
+
 
 
 ## Citation
@@ -47,6 +51,11 @@ You can uncomment the setting you want to run on top of the script.
 If you use this project in your research, please cite it.
 
 ```
-bibtex comes soon
+@article{deng2021discovering,
+  title={Discovering and Explaining the Representation Bottleneck of DNNs},
+  author={Deng, Huiqi and Ren, Qihan and Zhang, Hao and Zhang, Quanshi},
+  journal={arXiv preprint arXiv:2111.06236},
+  year={2021}
+}
 ```
 
