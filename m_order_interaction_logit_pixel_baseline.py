@@ -33,7 +33,7 @@ def compute_order_interaction_img(args, model: torch.nn.Module, feature: torch.T
         feature_shape: tuple, shape of feature
         name: str, name of this sample
         pairs: (pairs_num, 2) array, (i,j) pairs
-        ratio: float
+        ratio: float, ratio of the order of the interaction, order=(n-2)*ratio
         player_io_handler:
         interaction_logit_io_handler:
     Return:
@@ -55,7 +55,7 @@ def compute_order_interaction_img(args, model: torch.nn.Module, feature: torch.T
             print('\r\t\tPairs: \033[1;31m\033[5m%03d\033[0m/%03d' % (index + 1, len(pairs)), end='')
             point1, point2 = pair[0], pair[1]
 
-            players_curr_pair = players[index]
+            players_curr_pair = players[index] # context S for this pair of (i,j)
             mask = torch.zeros((4 * args.samples_number_of_s, channels, args.grid_size ** 2), device=args.device)
 
             if order != 0: # if order == 0, then S=emptyset, we don't need to set S
@@ -70,7 +70,7 @@ def compute_order_interaction_img(args, model: torch.nn.Module, feature: torch.T
 
             mask[4 * np.arange(args.samples_number_of_s) + 1, :, point1] = 1  # S U {i}
             mask[4 * np.arange(args.samples_number_of_s) + 2, :, point2] = 1  # S U {j}
-            mask[4 * np.arange(args.samples_number_of_s), :, point1] = 1
+            mask[4 * np.arange(args.samples_number_of_s), :, point1] = 1  # S U {i,j}
             mask[4 * np.arange(args.samples_number_of_s), :, point2] = 1  # S U {i,j}
 
             mask = mask.view(4 * args.samples_number_of_s, channels, args.grid_size, args.grid_size)
@@ -153,7 +153,9 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_id', default=1, type=int, help="GPU ID")
     parser.add_argument('--chosen_class', default='random', type=str,choices=['random'])
     parser.add_argument('--seed', default=0, type=int, help="random seed")
-    parser.add_argument('--grid_size', default=16, type=int)
+    parser.add_argument('--grid_size', default=16, type=int,
+                        help="partition the input image to grid_size * grid_size patches"
+                             "each patch is considered as a player")
 
     args = parser.parse_args()
 

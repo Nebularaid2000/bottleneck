@@ -9,6 +9,16 @@ from util.utils import clamp, seed_torch, prepare, log_args_and_backup_code
 
 
 def gen_pairs(grid_size: int, pair_num: int, stride: int = 1) -> np.ndarray:
+    """
+    Input:
+        grid_size: int, the image is partitioned to grid_size * grid_size patches. Each patch is considered as a player.
+        pair_num: int, how many (i,j) pairs to sample for one image
+        stride: int, j should be sampled in a neighborhood of i. stride is the radius of the neighborhood.
+            e.g. if stride=1, then j should be sampled from the 8 neighbors around i
+                if stride=2, then j should be sampled from the 24 neighbors around i
+    Return:
+        total_pairs: (pair_num,2) array, sampled (i,j) pairs
+    """
 
     neighbors = [(i, j) for i in range(-stride, stride + 1)
                  for j in range(-stride, stride + 1)
@@ -57,7 +67,9 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_id', default=1, type=int, help="GPU ID")
     parser.add_argument('--chosen_class', default='random', type=str, choices=['random'])
     parser.add_argument('--seed', default=0, type=int, help="random seed")
-    parser.add_argument('--grid_size', default=16, type=int)
+    parser.add_argument('--grid_size', default=16, type=int,
+                        help="partition the input image to grid_size * grid_size patches"
+                             "each patch is considered as a player")
 
     args = parser.parse_args()
 
@@ -81,30 +93,29 @@ if __name__ == '__main__':
     for index, (name, _, _) in enumerate(dataloader):
         print('\rPairs: \033[1;31m\033[5m%03d\033[0m/%03d' % (index + 1, len(image_list_selected)), end='')
 
-        seed_torch(1000 * index + args.seed)
+        seed_torch(1000 * index + args.seed) # seed for sampling (i,j) pair
         pairs = gen_pairs(args.grid_size, args.pairs_number, args.stride)
         for ratio in args.ratios:
             m = int((args.grid_size ** 2 - 2) * ratio)  # m-order
 
-            seed_torch(1000 * index + m + 1 + args.seed)
+            seed_torch(1000 * index + m + 1 + args.seed) # seed for sampling context S
             players_with_ratio = []
             for pair in pairs:
                 point1, point2 = pair[0], pair[1]
-                # m-order interactions
                 context = list(range(args.grid_size ** 2))
                 context.remove(point1)
                 context.remove(point2)
 
                 curr_players = []
                 for _ in range(args.samples_number_of_s):
-                    curr_players.append(np.random.choice(context, m, replace=False))
+                    curr_players.append(np.random.choice(context, m, replace=False)) # sample contexts of cardinality m
 
                 players_with_ratio.append(curr_players)
-            players_with_ratio = np.array(players_with_ratio)  # (pair_num, sample_num_of_s, m)
+            players_with_ratio = np.array(players_with_ratio)  # (pair_num, sample_num_of_s, m), contexts S of cardinality m for different (i,j) pairs
             print(players_with_ratio.shape)
             player_io_handler.save(round(ratio * 100), name[0], players_with_ratio)
         total_pairs.append(pairs)
-    total_pairs = np.array(total_pairs)  # (num_imgs, num_pairs, 2)
+    total_pairs = np.array(total_pairs)  # (num_imgs, num_pairs, 2), all (i,j) pairs
     print(total_pairs.shape)
     pair_io_handler.save(total_pairs)
     print('\nDone!')

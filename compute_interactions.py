@@ -20,7 +20,7 @@ def compute_order_interaction_img(args, name: str, label: torch.Tensor, ratio: f
         args: args
         name: str, name of this sample
         label: (1,) tensor, label of this sample
-        ratio: float
+        ratio: float, ratio of the order of the interaction, order=(n-2)*ratio
         interaction_logit_io_handler:
         interaction_io_handler:
     Return:
@@ -29,7 +29,7 @@ def compute_order_interaction_img(args, name: str, label: torch.Tensor, ratio: f
     interactions = []
 
     logits = interaction_logit_io_handler.load(round(ratio * 100), name)
-    logits = logits.reshape((args.pairs_number, args.samples_number_of_s * 4, args.class_number))
+    logits = logits.reshape((args.pairs_number, args.samples_number_of_s * 4, args.class_number)) # load saved logits
 
     for index in range(args.pairs_number):
         print('\r\t\tPairs: \033[1;31m\033[5m%03d\033[0m/%03d' % (index + 1, args.pairs_number), end='')
@@ -37,12 +37,13 @@ def compute_order_interaction_img(args, name: str, label: torch.Tensor, ratio: f
 
         v = get_reward(args, output_ori, label)  # (4*samples_number_of_s,)
 
+        # Delta v(i,j,S) = v(S∪{i,j}) - v(S∪{i}) - v(S∪{j}) + v(S)
         score_ori = v[4 * np.arange(args.samples_number_of_s)] + v[4 * np.arange(args.samples_number_of_s) + 3] \
                     - v[4 * np.arange(args.samples_number_of_s) + 1] - v[4 * np.arange(args.samples_number_of_s) + 2]
         interactions.extend(score_ori.tolist())
 
     print('')
-    interactions = np.array(interactions).reshape(-1, args.samples_number_of_s)
+    interactions = np.array(interactions).reshape(-1, args.samples_number_of_s) # (pair_num, sample_num)
     assert interactions.shape[0] == args.pairs_number
 
     interaction_io_handler.save(round(ratio * 100), name, interactions)  # (pair_num, sample_num)
@@ -85,10 +86,12 @@ if __name__ == '__main__':
     parser.add_argument("--dataset", default="cifar10", type=str, choices=['cifar10'])
     parser.add_argument('--gpu_id', default=1, type=int, help="GPU ID")
     parser.add_argument('--softmax_type', default='modified', type=str, choices=['normal','modified','yi'], help="reward function for interaction")
-    parser.add_argument('--out_type', default='gt', type=str, choices=['gt'])
+    parser.add_argument('--out_type', default='gt', type=str, choices=['gt'], help="we use the score of the ground truth class to compute interaction")
     parser.add_argument('--chosen_class', default='random', type=str, choices=['random'])
     parser.add_argument('--seed', default=0, type=int, help="random seed")
-    parser.add_argument('--grid_size', default=16, type=int)
+    parser.add_argument('--grid_size', default=16, type=int,
+                        help="partition the input image to grid_size * grid_size patches"
+                             "each patch is considered as a player")
     parser.add_argument('--no_cuda', action="store_true")
 
 

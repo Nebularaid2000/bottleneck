@@ -10,12 +10,12 @@ from common import config
 def set_args(args):
     args.prefix = config['prefix']
     args.ratios = config['ratios']
-    args.stride = config['stride'] # for sampling neighbor ij pair
+    args.stride = config['stride'] # radius of neighborhood for sampling (i,j) pair
     args.datasets_dirname = config['datasets_dirname']
     args.pretrained_models_dirname = config['pretrained_models_dirname']
 
     # ---- set sample number of ij, S and images ------
-    # compute interaction between image pixels (including all channels)
+    # compute interaction between image pixels/patches (including all channels)
     if args.inter_type == "pixel":
         args.pairs_number = config['pairs_number_pixel']
         args.samples_number_of_s = config['samples_number_of_s_pixel']
@@ -97,7 +97,7 @@ class SampleIoHandler(BaseIoHandler):
 
     def save(self, data):
         with open(self.file, 'w', encoding='UTF-8') as f:
-            # CIFAR10: class_name, img index(in the WHOLE dataset), class_index
+            # CIFAR10 format: class_name, img index(in the WHOLE dataset), class_index
             f.write('\n'.join(map(lambda item: f'{item[0]},{item[1]},{item[2]}', data)))
 
     def load(self):
@@ -107,7 +107,7 @@ class SampleIoHandler(BaseIoHandler):
                 item = line.strip().split(',')
 
                 if self.dataset == "cifar10":
-                    # CIFAR10: class_name, img index(in the WHOLE dataset, 0-based), class_index
+                    # CIFAR10 format: class_name, img index(in the WHOLE dataset, 0-based), class_index
                     data.append((item[0], int(item[1]), int(item[2])))
                 else:
                     raise Exception(f"dataset [{self.dataset}] not implemented. Error in SampleIoHandler.")
@@ -128,7 +128,7 @@ class PairIoHandler(BaseIoHandler): # load and save a player pair (i,j)
         return np.load(self.file)
 
 
-class PlayerIoHandler(BaseIoHandler):
+class PlayerIoHandler(BaseIoHandler): # load and save a context S
 
     def __init__(self, args) -> None:
         super().__init__(args.players_dir)
@@ -147,7 +147,7 @@ class PlayerIoHandler(BaseIoHandler):
         return np.load(players_file)
 
 
-class InteractionLogitIoHandler(BaseIoHandler):
+class InteractionLogitIoHandler(BaseIoHandler): # load and save logits
 
     def __init__(self, args) -> None:
         super().__init__(args.interactions_logit_dir)
@@ -167,7 +167,7 @@ class InteractionLogitIoHandler(BaseIoHandler):
         return torch.load(interaction_logit_file, map_location=self.device)
 
 
-class InteractionIoHandler(BaseIoHandler):
+class InteractionIoHandler(BaseIoHandler): # load and save interactions
 
     def __init__(self, args) -> None:
         super().__init__(args.interactions_dir)

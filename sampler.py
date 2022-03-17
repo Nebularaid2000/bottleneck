@@ -56,10 +56,8 @@ def check_if_correct_cls(args, model, dataloader, sample_list): # check whether 
         for index, (name, data, label) in enumerate(dataloader):
             data = data.to(args.device)
             label = label.to(args.device)
-            if "celeba" in args.dataset:
-                label = label[:, args.celeba_clf_attr]
             print("img: %d " % index, name, 'label:', label)
-            data = normalize(args, data) # this has no effect on tabular data
+            data = normalize(args, data)
 
             output = model(data)
             pred = torch.argmax(output, dim=1)
@@ -94,7 +92,9 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_id', default=0, type=int, help="GPU ID")
     parser.add_argument('--chosen_class', default='random', type=str, choices=['random'])
     parser.add_argument('--seed', default=0, type=int, help="random seed")
-    parser.add_argument('--grid_size', default=16, type=int)
+    parser.add_argument('--grid_size', default=16, type=int,
+                        help="partition the input image to grid_size * grid_size patches"
+                             "each patch is considered as a player")
 
     args = parser.parse_args()
     set_args(args)

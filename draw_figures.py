@@ -9,7 +9,7 @@ import argparse
 
 from io_handler import InteractionIoHandler, SampleIoHandler, set_args
 
-font_size = 20
+FONT = 20
 
 
 def get_name_list(args, sample_io_handler: SampleIoHandler):
@@ -39,12 +39,12 @@ def get_interactions_strength(args, sample_io_handler: SampleIoHandler, interact
 
 def draw_curve(interactions: Iterable[float], ratios: Iterable[float], title: str, filepath: str, ylim1=None, ylim2=None):
     plt.plot(ratios, interactions)
-    plt.title(title, fontsize=font_size)
-    plt.xlabel('Order', fontsize=font_size)
-    plt.ylabel('Interaction Strength', fontsize=font_size)
+    plt.title(title, fontsize=FONT)
+    plt.xlabel('Order', fontsize=FONT)
+    plt.ylabel('Interaction Strength', fontsize=FONT)
     plt.xticks(np.arange(0, 1.01, 0.2), map(lambda r: '%.1fn' % r, np.arange(0, 1.01, 0.2)))
     plt.ylim(ylim1, ylim2)
-    plt.tick_params(labelsize=font_size)
+    plt.tick_params(labelsize=FONT)
     plt.tight_layout()
     for format in ['png']:
         plt.savefig(f'{filepath}.{format}', format=format)
@@ -69,11 +69,14 @@ if __name__ == '__main__':
     parser.add_argument("--dataset", default="cifar10", type=str, choices=['cifar10'])
     parser.add_argument('--softmax_type', default='modified', type=str, choices=['normal', 'modified','yi'],
                         help="reward function for interaction")
-    parser.add_argument('--out_type', default='gt', type=str, choices=['gt'])
+    parser.add_argument('--out_type', default='gt', type=str, choices=['gt'],
+                        help="we use the score of the ground truth class to compute interaction")
     parser.add_argument('--chosen_class', default='random', type=str, choices=['random'])
     parser.add_argument('--gpu_id', default=1, type=int, help="GPU ID")
     parser.add_argument('--seed', default=0, type=int, help="random seed")
-    parser.add_argument('--grid_size', default=16, type=int)
+    parser.add_argument('--grid_size', default=16, type=int,
+                        help="partition the input image to grid_size * grid_size patches"
+                             "each patch is considered as a player")
 
     args = parser.parse_args()
 
@@ -89,7 +92,7 @@ if __name__ == '__main__':
     sample_io_handler = SampleIoHandler(args)
     interaction_io_handler = InteractionIoHandler(args)
 
-    Jm = get_interactions_strength(args, sample_io_handler, interaction_io_handler, args.ratios) # (ratio_num, img_num, pair_num) of I_ij^(m)
+    Jm = get_interactions_strength(args, sample_io_handler, interaction_io_handler, args.ratios) # (ratio_num,)
 
     print(Jm)
     draw_curve(Jm, args.ratios, 'Interaction Strength of Order (average)',
