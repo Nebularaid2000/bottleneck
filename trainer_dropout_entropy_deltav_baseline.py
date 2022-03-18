@@ -178,34 +178,17 @@ def main():
               train_ori_acc_list, val_ori_acc_list,
               train_entropy_acc_list, val_entropy_acc_list)
 
-def get_baseline_value(args, input, model):
+
+def get_dropout_output(args, input):
     """
     Input
         args: args
-        input: (N,3,H,W) tensor, input image (in batch), always H=W=224
-        model: nn.Module, model to be evaluated
+        input: (N,C,H,W) tensor, feature map to apply dropout
     Return:
-        baseline: (N, C) tensor, baseline for each channel of a feature map at args.dropout_pos
+        x_dp1: (N,C,H,W) tensor
+        x_dp2: (N,C,H,W) tensor
     """
-    with torch.no_grad():
-        gray_image = torch.zeros_like(input)
-        feature_map = model.all_layers[:args.dropout_pos](gray_image)  # (N,C,H',W') feature map at a specific layer corresponding to the gray image
-        baseline = torch.mean(feature_map, dim=(2, 3))  # (N,C)
-    return baseline
-
-
-def get_dropout_output(args, x_inter, baseline):
-    """
-    Input
-        args: args
-        x_inter: (N,C,H',W') tensor, feature map to apply dropout
-        model: nn.Module, model to be evaluated
-        baseline: (N,C) tensor
-    Return:
-        x_dp1: (N,C,H',W') tensor
-        x_dp2: (N,C,H',W') tensor
-    """
-    N, C, H, W = x_inter.size()
+    N, C, H, W = input.size()
     num_grids = args.grid_size ** 2
     preserve_number1 = int(args.preserve_rate1 * num_grids)  # preserve_rate1*H*W
     preserve_number2 = int(args.preserve_rate2 * num_grids)  # preserve_rate2*H*W
@@ -224,15 +207,7 @@ def get_dropout_output(args, x_inter, baseline):
         mask1[stack_idx1, :, index_mask1] = 0  # only contains 0 and 1
     mask1 = mask1.reshape((N, 1, args.grid_size, args.grid_size))
     mask1 = F.interpolate(mask1.clone(), size=[H, W], mode='nearest').float()
-    x_dp1 = x_inter * mask1
-
-    baseline_mask1 = torch.zeros(N, C, num_grids, device=args.device)
-    if index_mask1.shape[1] != 0:
-        baseline_mask1[stack_idx1, :, index_mask1] = baseline[:, None, :]
-    baseline_mask1 = baseline_mask1.reshape((N, C, args.grid_size, args.grid_size))
-    baseline_mask1 = F.interpolate(baseline_mask1.clone(), size=[H, W], mode='nearest').float()
-    x_dp1 = x_dp1 + baseline_mask1
-
+    x_dp1 = input * mask1
 
     mask2 = torch.ones(N, 1, num_grids, device=args.device)
     if index_mask2.shape[1] != 0:  # else, we will preserve all elements in x_inter, since mask2 is a all-one mask
@@ -242,14 +217,7 @@ def get_dropout_output(args, x_inter, baseline):
     mask2 = F.interpolate(mask2.clone(), size=[H, W], mode='nearest').float()
     if args.preserve_rate2 == 0:
         assert torch.norm(mask2) == 0
-    x_dp2 = x_inter * mask2
-
-    baseline_mask2 = torch.zeros(N, C, num_grids, device=args.device)
-    if index_mask2.shape[1] != 0:
-        baseline_mask2[stack_idx2, :, index_mask2] = baseline[:, None, :]
-    baseline_mask2 = baseline_mask2.reshape((N, C, args.grid_size, args.grid_size))
-    baseline_mask2 = F.interpolate(baseline_mask2.clone(), size=[H, W], mode='nearest').float()
-    x_dp2 = x_dp2 + baseline_mask2
+    x_dp2 = input * mask2
 
     return x_dp1, x_dp2
 
@@ -301,15 +269,12 @@ def train(args, train_loader, model, criterion, optimizer, epoch):
         optimizer.zero_grad()
         ori_loss.backward()
 
-        x_inter = model.all_layers[:args.dropout_pos](input)  # (N,C,H',W')
-        baseline = get_baseline_value(args, input, model) # (N, C)
-
         delta_v = 0.
         for S_idx in range(args.S_sample_num):  # default is 1
-            x_dp1, x_dp2 = get_dropout_output(args, x_inter, baseline)
+            x_dp1, x_dp2 = get_dropout_output(args, input)
             output1 = model.all_layers[args.dropout_pos:](x_dp1)
             output2 = model.all_layers[args.dropout_pos:](x_dp2)
-            delta_v = delta_v + output1 - output2 * args.align_coef
+            delta_v = delta_v + output1 - output2 * args.align_coef # delta v = v(r2 n) - r2/r1 * v(r1 n)
         delta_v = delta_v / args.S_sample_num
 
         # backward twice to save memory (continued)
@@ -349,6 +314,7 @@ def train(args, train_loader, model, criterion, optimizer, epoch):
                       ori_accs=ori_accs, entropy_accs=entropy_accs))
     return losses.avg, ori_losses.avg, entropy_losses.avg, ori_accs.avg, entropy_accs.avg
 
+
 def validate(args, val_loader, model, criterion, epoch):
     """
     Run evaluation
@@ -374,15 +340,12 @@ def validate(args, val_loader, model, criterion, epoch):
             output = model.all_layers(input) # when model in eval mode, no dropout applied
             ori_loss = criterion(output, target) * args.lam1
 
-            x_inter = model.all_layers[:args.dropout_pos](input)  # (N,C,H',W')
-            baseline = get_baseline_value(args, input, model) # (N, C)
-
             delta_v = 0.
             for S_idx in range(args.S_sample_num):  # default is 1
-                x_dp1, x_dp2 = get_dropout_output(args, x_inter, baseline)
+                x_dp1, x_dp2 = get_dropout_output(args, input)
                 output1 = model.all_layers[args.dropout_pos:](x_dp1)
                 output2 = model.all_layers[args.dropout_pos:](x_dp2)
-                delta_v = delta_v + output1 - output2 * args.align_coef
+                delta_v = delta_v + output1 - output2 * args.align_coef  # delta v = v(r2 n) - r2/r1 * v(r1 n)
             delta_v = delta_v / args.S_sample_num
 
             entropy = get_entropy(delta_v)
