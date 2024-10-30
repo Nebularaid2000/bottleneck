@@ -51,11 +51,12 @@ The results are saved in the `results` directory by default.
 If you use this project in your research, please cite it.
 
 ```
-@article{deng2021discovering,
-  title={Discovering and Explaining the Representation Bottleneck of DNNs},
-  author={Deng, Huiqi and Ren, Qihan and Zhang, Hao and Zhang, Quanshi},
-  journal={arXiv preprint arXiv:2111.06236},
-  year={2021}
+@inproceedings{
+  deng2022discovering,
+  title={{Discovering} and {Explaining} the {Representation} {Bottleneck} of {DNNs}},
+  author={Huiqi Deng and Qihan Ren and Hao Zhang and Quanshi Zhang},
+  booktitle={International Conference on Learning Representations},
+  year={2022}
 }
 ```
 
